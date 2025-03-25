@@ -1,5 +1,78 @@
 # ORB-SLAM3
 
+### OSX version, Macbook pro, M2, Mac OS:15.3.2
+Here’s a clean and professional `README.md` section that describes your changes and setup, rewritten in a more native and natural way:
+
+---
+
+```markdown
+## ORB-SLAM3 macOS Setup (Apple Silicon)
+
+This guide describes how to set up and build ORB-SLAM3 on macOS with Apple Silicon (M1/M2), including the necessary dependencies and module modifications for compatibility.
+
+### 🧰 1. Install Dependencies
+
+Use Homebrew to install the required libraries.  
+Make sure all libraries are installed for **arm64 architecture**:
+
+```bash
+brew install cmake opencv eigen boost openssl
+```
+
+---
+
+### 🧱 2. Build Third-Party Libraries
+
+You need to build the following libraries from source, instructions as the following part 2:
+- **DBoW2**
+- **g2o**
+- **Sophus**
+- **Pangolin** (used for visualization and UI)
+
+For Pangolin, follow the official instructions here:  
+🔗 https://github.com/stevenlovegrove/Pangolin
+
+Here's how I built Pangolin using Ninja:
+
+```bash
+mkdir build
+cd build
+cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release
+ninja
+```
+
+---
+
+### 🚀 3. Build ORB-SLAM3 (Release Mode)
+
+Once all third-party libraries are compiled, you can build ORB-SLAM3 in **Release** mode.
+
+```bash
+mkdir build
+cd build
+cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release
+ninja
+```
+
+This setup allows you to run ORB-SLAM3 on macOS without the viewer, and all modules are updated to work with Python 3 and the Apple Silicon toolchain.
+
+**monocular test:**
+
+./Examples/Monocular/mono_euroc Vocabulary/ORBvoc.bin Examples/Monocular/EuRoC.yaml Data/MH01 Examples/Monocular/EuRoC_TimeStamps/MH01.txt
+
+<img width="817" alt="image" src="https://github.com/user-attachments/assets/32882cde-5ecb-4746-85ff-fcd8bd0f4095" />
+
+
+---
+
+### 📝 Notes on Changes
+
+The following components were modified:
+- `CMakeLists.txt` (core and third-party modules)
+- Evaluation scripts updated to support Python 3 (`evaluation/evaluate_ate_scale_py3.py`, `associate_py3.py`)
+- Multiple `Examples/` modules adapted for macOS
+- `.gitignore` added to exclude build and data directories
+
 ### V1.0, December 22th, 2021
 **Authors:** Carlos Campos, Richard Elvira, Juan J. Gómez Rodríguez, [José M. M. Montiel](http://webdiis.unizar.es/~josemari/), [Juan D. Tardos](http://webdiis.unizar.es/~jdtardos/).
 
