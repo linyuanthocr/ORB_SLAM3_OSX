@@ -163,6 +163,9 @@ void Viewer::Run()
 {
     mbFinished = false;
     mbStopped = false;
+    
+    std::cout << "Pangolin viewer thread started" << std::endl;
+
 
     pangolin::CreateWindowAndBind("ORB-SLAM3: Map Viewer",1024,768);
 

@@ -33,6 +33,11 @@
 #include <boost/archive/xml_iarchive.hpp>
 #include <boost/archive/xml_oarchive.hpp>
 
+bool has_suffix(const std::string &str, const std::string &suffix) {
+  std::size_t index = str.find(suffix, str.size() - suffix.size());
+  return (index != std::string::npos);
+}
+
 namespace ORB_SLAM3
 {
 
@@ -115,7 +120,15 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
 
         mpVocabulary = new ORBVocabulary();
-        bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
+        // bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
+        bool bVocLoad = false; // chose loading method based on file extension
+        if (has_suffix(strVocFile, ".txt"))
+            bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
+        else
+        {
+            cout << "Loading Binary Vocabulary..." << endl << endl;
+            bVocLoad = mpVocabulary->loadFromBinaryFile(strVocFile);
+        }
         if(!bVocLoad)
         {
             cerr << "Wrong path to vocabulary. " << endl;
@@ -137,7 +150,12 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
 
         mpVocabulary = new ORBVocabulary();
-        bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
+        // bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
+        bool bVocLoad = false; // chose loading method based on file extension
+        if (has_suffix(strVocFile, ".txt"))
+        bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
+        else
+        bVocLoad = mpVocabulary->loadFromBinaryFile(strVocFile);
         if(!bVocLoad)
         {
             cerr << "Wrong path to vocabulary. " << endl;
@@ -230,7 +248,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     //if(false) // TODO
     {
         mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile,settings_);
-        mptViewer = new thread(&Viewer::Run, mpViewer);
+        // mptViewer = new thread(&Viewer::Run, mpViewer);
         mpTracker->SetViewer(mpViewer);
         mpLoopCloser->mpViewer = mpViewer;
         mpViewer->both = mpFrameDrawer->both;
@@ -240,6 +258,17 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     Verbose::SetTh(Verbose::VERBOSITY_QUIET);
 
 }
+
+void System::RunViewer()
+{
+#ifdef __APPLE__
+    // On macOS, run viewer in the main thread to avoid GUI crash
+    mpViewer->Run();
+#else
+    mptViewer = new thread(&Viewer::Run, mpViewer);
+#endif
+}
+
 
 Sophus::SE3f System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const vector<IMU::Point>& vImuMeas, string filename)
 {

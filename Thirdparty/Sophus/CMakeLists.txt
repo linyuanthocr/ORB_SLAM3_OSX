@@ -1,40 +1,55 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.16)
 project(Sophus VERSION 1.1.0)
 
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
-# Release by default
-# Turn on Debug with "-DCMAKE_BUILD_TYPE=Debug"
+# Set default build type to Release
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-set(CMAKE_CXX_STANDARD 11)
+# Enforce C++14 standard
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Set compiler specific settings (FixMe: Should not cmake do this for us automatically?)
-IF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-   SET(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g")
-   SET(CMAKE_CXX_FLAGS_RELEASE "-O3")
-   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wextra  -Wno-deprecated-register -Qunused-arguments -fcolor-diagnostics")
-ELSEIF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-   SET(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g")
-   SET(CMAKE_CXX_FLAGS_RELEASE "-O3")
-   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wextra -std=c++11 -Wno-deprecated-declarations -ftemplate-backtrace-limit=0")
-   SET(CMAKE_CXX_FLAGS_COVERAGE "${CMAKE_CXX_FLAGS_DEBUG} --coverage -fno-inline -fno-inline-small-functions -fno-default-inline")
-   SET(CMAKE_EXE_LINKER_FLAGS_COVERAGE "${CMAKE_EXE_LINKER_FLAGS_DEBUG} --coverage")
-   SET(CMAKE_SHARED_LINKER_FLAGS_COVERAGE "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} --coverage")
-ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES "^MSVC$")
-   ADD_DEFINITIONS("-D _USE_MATH_DEFINES /bigobj /wd4305 /wd4244 /MP")
-ENDIF()
+# Detect macOS architecture
+execute_process(COMMAND uname -m OUTPUT_VARIABLE ARCH OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-# Add local path for finding packages, set the local version first
+if (ARCH STREQUAL "arm64")
+    set(CMAKE_OSX_ARCHITECTURES arm64)
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -mcpu=neoverse-n1")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -mcpu=neoverse-n1")
+    message(STATUS "✅ Building for Apple Silicon (arm64)")
+else()
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -march=native")
+    message(STATUS "⚠️ Building for non-Apple Silicon: ${ARCH}")
+endif()
+
+# Compiler-specific settings
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wextra -Wno-deprecated-register -Qunused-arguments -fcolor-diagnostics")
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wextra -std=c++14 -Wno-deprecated-declarations -ftemplate-backtrace-limit=0")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "^MSVC$")
+    add_definitions("-D _USE_MATH_DEFINES /bigobj /wd4305 /wd4244 /MP")
+endif()
+
+# Add custom CMake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules")
 
-# Find Eigen 3 (dependency)
-find_package(Eigen3 3.3.0 REQUIRED)
+# Find Eigen 3.4
+find_package(Eigen3 3.4 REQUIRED)
+if(EIGEN3_FOUND)
+    set(G2O_EIGEN3_INCLUDE ${EIGEN3_INCLUDE_DIR} CACHE PATH "Directory of Eigen3")
+    message(STATUS "✅ Found Eigen3: ${EIGEN3_INCLUDE_DIR}")
+else()
+    message(FATAL_ERROR "❌ Eigen3 not found! Please install Eigen 3.4+ (e.g., via `brew install eigen` on macOS)")
+endif()
 
-# Define interface library target
+# Create header-only library target
 add_library(sophus INTERFACE)
 
 set(SOPHUS_HEADER_FILES
@@ -59,32 +74,22 @@ set(SOPHUS_HEADER_FILES
   sophus/formatstring.hpp
 )
 
-set(SOPHUS_OTHER_FILES
-  sophus/test_macros.hpp
-  sophus/example_ensure_handler.cpp
-)
-
-if(MSVC)
-  # Define common math constants if we compile with MSVC
-  target_compile_definitions (sophus INTERFACE _USE_MATH_DEFINES)
-endif (MSVC)
-
-# Add Eigen interface dependency, depending on available cmake info
+# Ensure Eigen dependency
 if(TARGET Eigen3::Eigen)
-  target_link_libraries(sophus INTERFACE Eigen3::Eigen)
-  set(Eigen3_DEPENDENCY "find_dependency (Eigen3 ${Eigen3_VERSION})")
-else(TARGET Eigen3::Eigen)
-  target_include_directories (sophus SYSTEM INTERFACE ${EIGEN3_INCLUDE_DIR})
-endif(TARGET Eigen3::Eigen)
+    target_link_libraries(sophus INTERFACE Eigen3::Eigen)
+    set(Eigen3_DEPENDENCY "find_dependency (Eigen3 ${Eigen3_VERSION})")
+else()
+    target_include_directories(sophus SYSTEM INTERFACE ${EIGEN3_INCLUDE_DIR})
+endif()
 
-# Associate target with include directory
+# Associate target with include directories
 target_include_directories(sophus INTERFACE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 
-# Declare all used C++11 features
-target_compile_features (sophus INTERFACE
+# Declare required C++14 features
+target_compile_features(sophus INTERFACE
   cxx_auto_type
   cxx_decltype
   cxx_nullptr
@@ -93,17 +98,14 @@ target_compile_features (sophus INTERFACE
   cxx_variadic_templates
 )
 
-# Add sources as custom target so that they are shown in IDE's
-add_custom_target(other SOURCES ${SOPHUS_OTHER_FILES})
-
-# Create 'test' make target using ctest
+# Enable tests (optional)
 option(BUILD_TESTS "Build tests." ON)
 if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(test)
 endif()
 
-# Create examples make targets using ctest
+# Enable examples (optional)
 option(BUILD_EXAMPLES "Build examples." ON)
 if(BUILD_EXAMPLES)
     add_subdirectory(examples)
@@ -130,18 +132,18 @@ configure_package_config_file(
   NO_CHECK_REQUIRED_COMPONENTS_MACRO
 )
 
-# Remove architecture dependence. Sophus is a header-only library.
+# Ensure architecture independence for a header-only library
 set(TEMP_SIZEOF_VOID_P ${CMAKE_SIZEOF_VOID_P})
 unset(CMAKE_SIZEOF_VOID_P)
 
 # Write version to file
-write_basic_package_version_file (
+write_basic_package_version_file(
   SophusConfigVersion.cmake
   VERSION ${PROJECT_VERSION}
   COMPATIBILITY SameMajorVersion
 )
 
-# Recover architecture dependence
+# Restore architecture dependence
 set(CMAKE_SIZEOF_VOID_P ${TEMP_SIZEOF_VOID_P})
 
 # Install cmake targets
