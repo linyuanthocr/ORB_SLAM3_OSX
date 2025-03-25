@@ -3,9 +3,7 @@
 ### OSX version, Macbook pro, M2, Mac OS:15.3.2
 Here’s a clean and professional `README.md` section that describes your changes and setup, rewritten in a more native and natural way:
 
----
 
-```markdown
 ## ORB-SLAM3 macOS Setup (Apple Silicon)
 
 This guide describes how to set up and build ORB-SLAM3 on macOS with Apple Silicon (M1/M2), including the necessary dependencies and module modifications for compatibility.
@@ -18,8 +16,6 @@ Make sure all libraries are installed for **arm64 architecture**:
 ```bash
 brew install cmake opencv eigen boost openssl
 ```
-
----
 
 ### 🧱 2. Build Third-Party Libraries
 
