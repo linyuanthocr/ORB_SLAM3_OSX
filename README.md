@@ -1,8 +1,6 @@
 # ORB-SLAM3
 
 ### OSX version, Macbook pro, M2, Mac OS:15.3.2
-Here’s a clean and professional `README.md` section that describes your changes and setup, rewritten in a more native and natural way:
-
 
 ## ORB-SLAM3 macOS Setup (Apple Silicon)
 
